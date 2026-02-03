@@ -22,7 +22,7 @@
         "functionCode": "const fs = require('fs');\nconst defaults = {\n  hook_intensity: 0.7,\n  hook_duration_seconds: 15,\n  question_frequency: 0.3,\n  first_question_time_seconds: 45,\n  pacing: \"medium\",\n  psychological_pressure: 0.5,\n  topic_breadth: \"balanced\"\n};\n\nlet params = defaults;\n\ntry {\n  if (fs.existsSync('./control_params.json')) {\n    const data = JSON.parse(fs.readFileSync('./control_params.json', 'utf8'));\n    params = { ...defaults, ...data };\n  }\n} catch (error) {\n  params = defaults;\n}\n\nreturn [{ json: params }];\n"
       },
       "id": "5001e7b2-2f1a-4a3e-a205-90f9b2f75eb7",
-      "name": "Read Control Parameters",
+      "name": "Set Default Parameters",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
@@ -116,14 +116,14 @@
     {
       \"parts\": [
         {
-          \"text\": \"You are a viral YouTube scriptwriter. Create a 6-8 minute psychological thriller video about: {{ $json.topic }}.\\n\\nUse this research context for realism:\\n{{ $json.research_headlines }}\\n\\nControl parameters (from last run): hook_intensity={{ $node['Read Control Parameters'].json.hook_intensity }}, hook_duration_seconds={{ $node['Read Control Parameters'].json.hook_duration_seconds }}, question_frequency={{ $node['Read Control Parameters'].json.question_frequency }}, first_question_time_seconds={{ $node['Read Control Parameters'].json.first_question_time_seconds }}, pacing={{ $node['Read Control Parameters'].json.pacing }}, psychological_pressure={{ $node['Read Control Parameters'].json.psychological_pressure }}, topic_breadth={{ $node['Read Control Parameters'].json.topic_breadth }}\\n\\nOUTPUT JSON format only (no markdown).\\n\\nRULES:\\n1. 'narration': The text to be spoken (6-8 minute runtime)\\n2. 'visual_query': A concrete, physical search term for Pixabay (e.g. 'storm clouds', 'busy crowd')\\n3. MUST include a KILLER HOOK in first 10 seconds that makes viewers say \\\"I need to know more!\\\"\\n4. EVERY scene must feel like it's about the viewer (extreme relatability)\\n5. End every scene with an UNANSWERED QUESTION\\n6. Total script must have 12-18 scenes (each 20-35 seconds) to reach 6-8 minutes\\n7. Include 3 \\\"pattern interrupt\\\" moments that surprise viewers\\n8. Every 3rd scene must contain a real psychological fact with cited source\\n9. The narration must sound natural and human (avoid robotic or repetitive phrasing)\\n\\nSCHEMA:\\n{\\n  \\\"script\\\": [\\n    {\\n      \\\"scene_index\\\": 1,\\n      \\\"narration\\\": \\\"Your 10-second hook that triggers immediate emotional connection...\\\",\\n      \\\"visual_query\\\": \\\"concrete physical search term\\\",\\n      \\\"duration\\\": 24\\n    }\\n  ]\\n}\\"\n        }
+          \"text\": \"You are a viral YouTube scriptwriter. Create a 6-8 minute psychological thriller video about: {{ $json.topic }}.\\n\\nUse this research context for realism:\\n{{ $json.research_headlines }}\\n\\nControl parameters (from last run): hook_intensity={{ $node['Set Default Parameters'].json.hook_intensity }}, hook_duration_seconds={{ $node['Set Default Parameters'].json.hook_duration_seconds }}, question_frequency={{ $node['Set Default Parameters'].json.question_frequency }}, first_question_time_seconds={{ $node['Set Default Parameters'].json.first_question_time_seconds }}, pacing={{ $node['Set Default Parameters'].json.pacing }}, psychological_pressure={{ $node['Set Default Parameters'].json.psychological_pressure }}, topic_breadth={{ $node['Set Default Parameters'].json.topic_breadth }}\\n\\nOUTPUT JSON format only (no markdown).\\n\\nRULES:\\n1. 'narration': The text to be spoken (6-8 minute runtime)\\n2. 'visual_query': A concrete, physical search term for Pixabay (e.g. 'storm clouds', 'busy crowd')\\n3. MUST include a KILLER HOOK in first 10 seconds that makes viewers say \\\"I need to know more!\\\"\\n4. EVERY scene must feel like it's about the viewer (extreme relatability)\\n5. End every scene with an UNANSWERED QUESTION\\n6. Total script must have 12-18 scenes (each 20-35 seconds) to reach 6-8 minutes\\n7. Include 3 \\\"pattern interrupt\\\" moments that surprise viewers\\n8. Optionally, every 3rd scene may reference a well-known psychological effect or everyday mental pattern in general terms, but you must NOT invent or cite specific studies, journals, or statistics. If unsure, omit any source.\\n9. The narration must sound natural and human (avoid robotic or repetitive phrasing)\\n\\nSCHEMA:\\n{\\n  \\\"script\\\": [\\n    {\\n      \\\"scene_index\\\": 1,\\n      \\\"narration\\\": \\\"Your 10-second hook that triggers immediate emotional connection...\\\",\\n      \\\"visual_query\\\": \\\"concrete physical search term\\\",\\n      \\\"duration\\\": 24\\n    }\\n  ]\\n}\\"\n        }
       ]
     }
   ]
 }
 ",
         "headerParametersJson": "{\n  \"Content-Type\": \"application/json\"\n}\n",
-        "queryParametersJson": "{\n  \"key\": \"AIzaSyA2buQhJ5uZX-Ym2v89rSVYD-zzaSTECHc\"\n}\n"
+        "queryParametersJson": "{\n  \"key\": \"={{ $env.GOOGLE_API_KEY }}\"\n}\n"
       },
       "id": "1eba62ae-91d1-4e50-b707-537003b8b24b",
       "name": "Generate Script & Scenes",
@@ -132,70 +132,6 @@
       "position": [
         2000,
         -400
-      ]
-    },
-    {
-      "parameters": {
-        "amount": 23
-      },
-      "id": "7e90cfd0-8eac-4460-af66-e94c6a328b6e",
-      "name": "Wait 24 Hours",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1,
-      "position": [
-        4512,
-        496
-      ],
-      "webhookId": "d7a8555a-29cf-4d25-81b8-a003a870bc29"
-    },
-    {
-      "parameters": {
-        "functionCode": "// Fetch analytics from a local file if available, otherwise fallback to mock data.\nconst fs = require('fs');\n\nlet analytics;\ntry {\n  if (fs.existsSync('./analytics.json')) {\n    analytics = JSON.parse(fs.readFileSync('./analytics.json', 'utf8'));\n  }\n} catch (error) {\n  analytics = null;\n}\n\nif (!analytics) {\n  analytics = {\n    views: Math.floor(Math.random() * 1000) + 100,\n    averageViewDuration: Math.floor(Math.random() * 120) + 30,\n    retention_30s: Math.random().toFixed(2),\n    retention_60s: Math.random().toFixed(2)\n  };\n}\n\nreturn [{ json: analytics }];"
-      },
-      "id": "85364d6c-c673-45ff-9c71-e8e27f27e1c0",
-      "name": "Fetch Analytics",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [
-        4736,
-        496
-      ]
-    },
-    {
-      "parameters": {
-        "authentication": "headerAuth",
-        "requestMethod": "POST",
-        "url": "https://api.deepseek.com/chat/completions",
-        "jsonParameters": true,
-        "options": {},
-        "bodyParametersJson": "={\n  \"model\": \"deepseek-chat\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You analyze YouTube analytics and provide concrete improvements for the next script. Output JSON only.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Here are the latest video analytics: {{ JSON.stringify($json) }}.\\n\\nReturn an updated control parameter object with fields: hook_intensity, hook_duration_seconds, question_frequency, first_question_time_seconds, pacing, psychological_pressure, topic_breadth, and a short improvement_summary.\"\n    }\n  ],\n  \"temperature\": 0.3\n}\n"
-      },
-      "id": "39f829ad-ddec-403f-96d7-7f1637da0af9",
-      "name": "AI Analysis & Adjustments",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 1,
-      "position": [
-        4960,
-        496
-      ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "MJVnHet3GPy7ZxSH",
-          "name": "pexels api"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "functionCode": "// Save new control parameters for next run\nconst fs = require('fs');\n\nlet newParams = $json;\nconst content = $json?.choices?.[0]?.message?.content;\n\nif (content) {\n  try {\n    newParams = JSON.parse(content);\n  } catch (error) {\n    newParams = { raw_response: content };\n  }\n}\n\n// Add timestamp for tracking\nnewParams.last_updated = new Date().toISOString();\n\nfs.writeFileSync('./control_params.json', JSON.stringify(newParams, null, 2));\nreturn [{ json: { status: 'parameters_saved', params: newParams } }];"
-      },
-      "id": "108b11d7-00d9-419d-8ccc-4844e710ae48",
-      "name": "Save Control Parameters",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [
-        5184,
-        496
       ]
     },
     {
@@ -251,7 +187,7 @@
         -400
       ],
       "id": "46738c9b-a9c1-4c04-862e-7158151ec4fa",
-      "name": "Debug fix"
+      "name": "Topic passthrough"
     },
     {
       "parameters": {
@@ -393,7 +329,7 @@
           "parameters": [
             {
               "name": "key",
-              "value": "54464920-4a3ce7aed37fed4974c4ab69f"
+              "value": "={{ $env.PIXABAY_API_KEY }}"
             },
             {
               "name": "q",
@@ -418,7 +354,7 @@
         -304
       ],
       "id": "05aafa7a-64f1-4bad-8f0a-0bc786218795",
-      "name": "Pixaby get"
+      "name": "Pixabay get"
     },
     {
       "parameters": {
@@ -450,7 +386,7 @@
     },
     {
       "parameters": {
-        "command": "=rm -f /tmp/scene_final_*.mp4\n\nffmpeg -y \\\n-i \"{{ $json.video_url }}\" \\\n-i \"{{ $json.audio_path }}\" \\\n-map 0:v:0 -map 1:a:0 \\\n-vf \"\nscale=1920:1080:force_original_aspect_ratio=increase,\ncrop=1920:1080,\nfps=24,\neq=saturation=0.7:contrast=1.25:brightness=-0.04:gamma=1.08,\nnoise=c0s=1.5:allf=t+u,\nvignette=PI/5,\nunsharp=3:3:1.2:3:3:0.4,\ngradfun=strength=1.1:radius=12\n\" \\\n-c:v libx264 -preset fast -profile:v high -pix_fmt yuv420p -crf 22 \\\n-c:a aac -b:a 192k \\\n-shortest \\\n-avoid_negative_ts make_zero \\\n\"{{ $json.scene_final_path }}\"\n"
+        "command": "=rm -f /tmp/scene_final_*.mp4\n\nffmpeg -y \\\n-stream_loop -1 -i \"{{ $json.video_url }}\" \\\n-i \"{{ $json.audio_path }}\" \\\n-map 0:v:0 -map 1:a:0 \\\n-vf \"\nscale=1920:1080:force_original_aspect_ratio=increase,\ncrop=1920:1080,\nfps=24,\neq=saturation=0.7:contrast=1.25:brightness=-0.04:gamma=1.08,\nnoise=c0s=1.5:allf=t+u,\nvignette=PI/5,\nunsharp=3:3:1.2:3:3:0.4,\ngradfun=strength=1.1:radius=12\n\" \\\n-c:v libx264 -preset fast -profile:v high -pix_fmt yuv420p -crf 22 \\\n-c:a aac -b:a 192k \\\n-shortest \\\n-avoid_negative_ts make_zero \\\n\"{{ $json.scene_final_path }}\"\n"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -463,7 +399,7 @@
     },
     {
       "parameters": {
-        "command": "=#!/bin/bash\nset -e\n\n# 1. CLEANUP: Remove old artifacts to prevent mixing past runs\n# (If you don't do this, a previous run's \"scene_10.mp4\" might get added to a new 5-scene video!)\nrm -f /tmp/scenes.txt /tmp/final_video.mp4\n\necho \"=== Checking scene files ===\"\n# 2. DYNAMIC LOOP: Sorts files naturally (scene_1, scene_2... scene_10)\n# This handles any number of scenes, not just 10.\nfind /tmp -name \"scene_final_*.mp4\" -print0 | sort -z -V | while IFS= read -r -d '' file; do\n  echo \"file '$file'\" >> /tmp/scenes.txt\n  echo \"Added $file to list\"\ndone\n\n# 3. VERIFY: Check if scenes.txt actually has content\nif [ ! -s /tmp/scenes.txt ]; then\n  echo \"ERROR: No scene files found in /tmp/!\"\n  # List tmp to help debug what IS there\n  ls -la /tmp/\n  exit 1\nfi\n\necho \"=== Concatenating scenes ===\"\n# 4. CONCAT: Added '-safe 0' (already there, good) and proper error handling\nif ffmpeg -y -f concat -safe 0 -i /tmp/scenes.txt -c copy /tmp/final_video.mp4; then\n    SIZE=$(stat -c%s \"/tmp/final_video.mp4\")\n    echo \"Final video created: $SIZE bytes\"\n    # Return JSON for n8n\n    echo \"{\\\"final_path\\\": \\\"/tmp/final_video.mp4\\\"}\"\nelse\n    echo \"ERROR: FFmpeg concatenation failed.\"\n    exit 1\nfi"
+        "command": "=#!/bin/bash\nset -e\n\n# 1. CLEANUP: Remove old artifacts to prevent mixing past runs\n# (If you don't do this, a previous run's \"scene_10.mp4\" might get added to a new 5-scene video!)\nrm -f /tmp/scenes.txt /tmp/final_video.mp4\n\necho \"=== Checking scene files ===\"\n# 2. DYNAMIC LOOP: Sorts files naturally (scene_1, scene_2... scene_10)\n# This handles any number of scenes, not just 10.\nfind /tmp -name \"scene_final_*.mp4\" -print0 | sort -z -V | while IFS= read -r -d '' file; do\n  echo \"file '$file'\" >> /tmp/scenes.txt\n  echo \"Added $file to list\"\ndone\n\n# 3. VERIFY: Check if scenes.txt actually has content\nif [ ! -s /tmp/scenes.txt ]; then\n  echo \"ERROR: No scene files found in /tmp/!\"\n  # List tmp to help debug what IS there\n  ls -la /tmp/\n  exit 1\nfi\n\necho \"=== Concatenating scenes ===\"\n# 4. CONCAT: Added '-safe 0' (already there, good) and proper error handling\nif ffmpeg -y -f concat -safe 0 -i /tmp/scenes.txt -c copy /tmp/final_video.mp4; then\n    SIZE=$(stat -c%s \"/tmp/final_video.mp4\")\n    echo \"Final video created: $SIZE bytes\"\n    \n    # 5. CLEANUP: Remove temporary files after successful concatenation\n    echo \"=== Cleaning up temporary files ===\"\n    rm -f /tmp/scene_final_*.mp4\n    rm -f /tmp/audio_*.wav\n    rm -f /tmp/scenes.txt\n    \n    # Return JSON for n8n\n    echo \"{\\\"final_path\\\": \\\"/tmp/final_video.mp4\\\"}\"\nelse\n    echo \"ERROR: FFmpeg concatenation failed.\"\n    exit 1\nfi"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -476,7 +412,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// 1️⃣ Get the TTS output (which contains the duration)\nconst ttsOutput = $input.item.json;\n\n// 2️⃣ Verify we have duration from TTS\nif (!ttsOutput.duration || ttsOutput.duration === \"0\") {\n  console.warn(\"TTS node missing duration. Using fallback of 5.0 seconds\");\n  ttsOutput.duration = \"5.0\";\n}\n\n// 3️⃣ Get the original loop item (for scene context)\nconst loopItem = $('Loop Over Items').item.json;\n\n// 4️⃣ Preserve ALL required data for FFMPEG\nreturn [{\n  json: {\n    audio_path: loopItem.audio_path,\n    scene_index: loopItem.scene_index,\n    scene_final_path: loopItem.scene_final_path,\n    video_query: loopItem.video_query,\n    duration: ttsOutput.duration,  // Use duration from TTS output\n    video_url: $json.hits[0].videos.large.url\n  }\n}];\n"
+        "jsCode": "// 1️⃣ Get the TTS output (which contains the duration)\nconst ttsOutput = $input.item.json;\n\n// 2️⃣ Verify we have duration from TTS\nif (!ttsOutput.duration || ttsOutput.duration === \"0\") {\n  console.warn(\"TTS node missing duration. Using fallback of 5.0 seconds\");\n  ttsOutput.duration = \"5.0\";\n}\n\n// 3️⃣ Get the original loop item (for scene context)\nconst loopItem = $('Loop Over Items').item.json;\n\n// 4️⃣ Safely extract video URL from Pixabay response\nconst pixabayResponse = $json;\nlet videoUrl;\n\nif (\n  Array.isArray(pixabayResponse.hits) &&\n  pixabayResponse.hits.length > 0 &&\n  pixabayResponse.hits[0].videos &&\n  pixabayResponse.hits[0].videos.large &&\n  pixabayResponse.hits[0].videos.large.url\n) {\n  videoUrl = pixabayResponse.hits[0].videos.large.url;\n} else {\n  throw new Error('No video results returned from Pixabay for query: ' + (loopItem.video_query || 'unknown'));\n}\n\n// 5️⃣ Preserve ALL required data for FFMPEG\nreturn [{\n  json: {\n    audio_path: loopItem.audio_path,\n    scene_index: loopItem.scene_index,\n    scene_final_path: loopItem.scene_final_path,\n    video_query: loopItem.video_query,\n    duration: ttsOutput.duration,  // Use duration from TTS output\n    video_url: videoUrl\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -485,11 +421,11 @@
         -624
       ],
       "id": "bfeadbfd-0141-4270-91fa-1682d32955f7",
-      "name": "helps with downloading"
+      "name": "Merge TTS and Video Data"
     },
     {
       "parameters": {
-        "command": "=#!/bin/bash\nset -e\n\n# 1. Generate the audio\necho \"{{ $json.narration }}\" | python3 -m piper \\\n  --model /home/node/.local/share/piper_tts/voices/en_US-lessac-medium.onnx \\\n  --output_file /tmp/audio_raw_{{ $json.scene_index }}.wav\n\n# 2. Simple but effective enhancement\nffmpeg -y -i /tmp/audio_raw_{{ $json.scene_index }}.wav \\\n  -filter:a \"\n    highpass=f=80,\n    lowpass=f=8000,\n    acompressor=threshold=0.1:ratio=4:attack=20:release=300,\n    loudnorm=I=-16:LRA=11:TP=-1.5\n  \" \\\n  \"{{ $json.audio_path }}\"\n\n# 3. Get duration\nDURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"{{ $json.audio_path }}\")\n\n# 4. Success\necho \"{\\\"scene\\\": {{ $json.scene_index }}, \\\"status\\\": \\\"generated\\\", \\\"path\\\": \\\"{{ $json.audio_path }}\\\", \\\"duration\\\": \\\"$DURATION\\\"}\"\n"
+        "command": "=#!/bin/bash\nset -e\n\n# 1. Generate the audio\necho \"{{ $json.narration }}\" | python3 -m piper \\\n  --model /home/node/.local/share/piper_tts/voices/en_US-lessac-medium.onnx \\\n  --output_file /tmp/audio_raw_{{ $json.scene_index }}.wav\n\n# 2. Simple but effective enhancement\nffmpeg -y -i /tmp/audio_raw_{{ $json.scene_index }}.wav \\\n  -filter:a \"\n    highpass=f=80,\n    lowpass=f=8000,\n    acompressor=threshold=0.1:ratio=4:attack=20:release=300,\n    loudnorm=I=-16:LRA=11:TP=-1.5\n  \" \\\n  \"{{ $json.audio_path }}\"\n\n# 3. Clean up raw audio file\nrm -f /tmp/audio_raw_{{ $json.scene_index }}.wav\n\n# 4. Get duration\nDURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"{{ $json.audio_path }}\")\n\n# 5. Success\necho \"{\\\"scene\\\": {{ $json.scene_index }}, \\\"status\\\": \\\"generated\\\", \\\"path\\\": \\\"{{ $json.audio_path }}\\\", \\\"duration\\\": \\\"$DURATION\\\"}\"\n"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -498,11 +434,11 @@
         -272
       ],
       "id": "7da86255-d263-40cf-9d16-1283c7b5c861",
-      "name": "TTS GERATION"
+      "name": "TTS GENERATION"
     },
     {
       "parameters": {
-        "jsCode": "const inputData = $input.all()[0];\n\n// Preserve the binary data from Download File node\nconst binaryData = inputData.binary;\n\n// Get topic from ANY available source\nconst topic = \n  ($input.first()?.json?.topic) ||                          \n  ($node['Pick Best Topic']?.json[0]?.topic) ||            \n  ($node['BETTER SCRIPTING']?.json[0]?.video_query) ||       \n  \"Dark Psychology Secrets\";                                 \n\n// Generate title\nconst cleanTopic = String(topic).substring(0, 40);\nconst year = new Date().getFullYear();\nconst title = `SHOCKING ${cleanTopic} (${year})`;\n\n// Create description\nconst description = `🔥 ${cleanTopic}\n00:00 - The truth about ${cleanTopic}\n01:30 - What they don't want you to know\n03:00 - How to protect yourself\n#DarkPsychology #${cleanTopic.replace(/\\s+/g, '')} #${year}\n→ SUBSCRIBE for more psychology insights`;\n\n// Generate tags\nconst tags = [\n  cleanTopic,\n  'dark psychology',\n  'psychology 2026',\n  'mental health',\n  'behavioral science'\n].join(',');\n\nreturn [{\n  json: {\n    title,\n    description,\n    tags\n  },\n  binary: binaryData  // ✅ Preserve binary data!\n}];\n"
+        "jsCode": "const inputData = $input.all()[0];\n\n// Preserve the binary data from Download File node\nconst binaryData = inputData.binary;\n\n// Get topic from ANY available source\nconst topic = \n  ($input.first()?.json?.topic) ||                          \n  ($node['Pick Best Topic']?.json[0]?.topic) ||            \n  ($node['BETTER SCRIPTING']?.json[0]?.video_query) ||       \n  \"Dark Psychology Secrets\";                                 \n\n// Generate title\nconst cleanTopic = String(topic).substring(0, 40);\nconst year = new Date().getFullYear();\nconst title = `SHOCKING ${cleanTopic} (${year})`;\n\n// Create description\nconst description = `🔥 ${cleanTopic}\n00:00 - The truth about ${cleanTopic}\n01:30 - What they don't want you to know\n03:00 - How to protect yourself\n#DarkPsychology #${cleanTopic.replace(/\\s+/g, '')} #${year}\n→ SUBSCRIBE for more psychology insights`;\n\n// Generate tags\nconst tags = [\n  cleanTopic,\n  'dark psychology',\n  `psychology ${year}`,\n  'mental health',\n  'behavioral science'\n].join(',');\n\nreturn [{\n  json: {\n    title,\n    description,\n    tags\n  },\n  binary: binaryData  // ✅ Preserve binary data!\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -557,19 +493,6 @@
     },
     {
       "parameters": {
-        "command": "=# 1. Check what files exist\nls -la /tmp/final_video.mp4\n\n# 2. Copy to binary format safely\ncp \"/tmp/final_video.mp4\" \"/tmp/video_for_upload.mp4\"\n\n# 3. Output success\necho \"video_copied_successfully\"\n"
-      },
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
-      "position": [
-        3872,
-        -384
-      ],
-      "id": "c4cddd28-66ef-443c-9af4-8917aaaa3e77",
-      "name": "Execute Command"
-    },
-    {
-      "parameters": {
         "fileSelector": "/tmp/final_video.mp4",
         "options": {
           "fileName": "data",
@@ -614,14 +537,14 @@
       "main": [
         [
           {
-            "node": "Read Control Parameters",
+            "node": "Set Default Parameters",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Read Control Parameters": {
+    "Set Default Parameters": {
       "main": [
         [
           {
@@ -687,44 +610,6 @@
         ]
       ]
     },
-    "Wait 24 Hours": {
-      "main": [
-        [
-          {
-            "node": "Fetch Analytics",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Analytics": {
-      "main": [
-        [
-          {
-            "node": "AI Analysis & Adjustments",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "AI Analysis & Adjustments": {
-      "main": [
-        [
-          {
-            "node": "Save Control Parameters",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Save Control Parameters": {
-      "main": [
-        []
-      ]
-    },
     "RSS Read": {
       "main": [
         [
@@ -751,14 +636,14 @@
       "main": [
         [
           {
-            "node": "Debug fix",
+            "node": "Topic passthrough",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Debug fix": {
+    "Topic passthrough": {
       "main": [
         [
           {
@@ -791,11 +676,11 @@
         ]
       ]
     },
-    "Pixaby get": {
+    "Pixabay get": {
       "main": [
         [
           {
-            "node": "helps with downloading",
+            "node": "Merge TTS and Video Data",
             "type": "main",
             "index": 0
           }
@@ -824,7 +709,7 @@
         ],
         [
           {
-            "node": "TTS GERATION",
+            "node": "TTS GENERATION",
             "type": "main",
             "index": 0
           }
@@ -846,14 +731,14 @@
       "main": [
         [
           {
-            "node": "Execute Command",
+            "node": "SEO",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "helps with downloading": {
+    "Merge TTS and Video Data": {
       "main": [
         [
           {
@@ -864,11 +749,11 @@
         ]
       ]
     },
-    "TTS GERATION": {
+    "TTS GENERATION": {
       "main": [
         [
           {
-            "node": "Pixaby get",
+            "node": "Pixabay get",
             "type": "main",
             "index": 0
           }
@@ -891,17 +776,6 @@
         [
           {
             "node": "Limit",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Execute Command": {
-      "main": [
-        [
-          {
-            "node": "SEO",
             "type": "main",
             "index": 0
           }
