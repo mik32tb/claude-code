@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "functionCode": "const fs = require('fs');\nconst defaults = {\n  hook_intensity: 0.7,\n  hook_duration_seconds: 15,\n  question_frequency: 0.3,\n  first_question_time_seconds: 45,\n  pacing: \"medium\",\n  psychological_pressure: 0.5,\n  topic_breadth: \"balanced\"\n};\n\nlet params = defaults;\n\ntry {\n  if (fs.existsSync('./control_params.json')) {\n    const data = JSON.parse(fs.readFileSync('./control_params.json', 'utf8'));\n    params = { ...defaults, ...data };\n  }\n} catch (error) {\n  params = defaults;\n}\n\nreturn [{ json: params }];\n"
+        "functionCode": "const defaults = {\n  hook_intensity: 0.7,\n  hook_duration_seconds: 15,\n  question_frequency: 0.3,\n  first_question_time_seconds: 45,\n  pacing: \"medium\",\n  psychological_pressure: 0.5,\n  topic_breadth: \"balanced\"\n};\n\nreturn [{ json: defaults }];\n"
       },
       "id": "5001e7b2-2f1a-4a3e-a205-90f9b2f75eb7",
       "name": "Set Default Parameters",
