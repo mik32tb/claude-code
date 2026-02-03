@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "functionCode": "return [{\n  json: {\n    hook_intensity: 0.7,\n    hook_duration_seconds: 15,\n    question_frequency: 0.3,\n    first_question_time_seconds: 45,\n    pacing: \"medium\",\n    psychological_pressure: 0.5,\n    topic_breadth: \"balanced\"\n  }\n}];\n"
+        "functionCode": "const fs = require('fs');\nconst defaults = {\n  hook_intensity: 0.7,\n  hook_duration_seconds: 15,\n  question_frequency: 0.3,\n  first_question_time_seconds: 45,\n  pacing: \"medium\",\n  psychological_pressure: 0.5,\n  topic_breadth: \"balanced\"\n};\n\nlet params = defaults;\n\ntry {\n  if (fs.existsSync('./control_params.json')) {\n    const data = JSON.parse(fs.readFileSync('./control_params.json', 'utf8'));\n    params = { ...defaults, ...data };\n  }\n} catch (error) {\n  params = defaults;\n}\n\nreturn [{ json: params }];\n"
       },
       "id": "5001e7b2-2f1a-4a3e-a205-90f9b2f75eb7",
       "name": "Read Control Parameters",
@@ -35,7 +35,7 @@
         "functionCode": "// RSS-based topic selection\n\n// n8n gives one item per RSS entry\n// We will transform each item into a usable topic\n\nconst title = $json.title;\nconst snippet = $json.contentSnippet || '';\n\n// Basic validation\nif (!title) {\n  return [];\n}\n\n// Simple heuristic scoring (can improve later)\nlet score = 0;\n\n// Strong psychology keywords\nconst keywords = [\n  'dark',\n  'manipulate',\n  'manipulation',\n  'control',\n  'personality',\n  'traits',\n  'psychology',\n  'behavior',\n  'toxic'\n];\n\n// Score based on keyword presence\nkeywords.forEach(keyword => {\n  if (title.toLowerCase().includes(keyword)) {\n    score += 1;\n  }\n});\n\n// Prefer titles that sound personal / emotional\nif (title.toLowerCase().includes('people')) score += 0.5;\nif (title.toLowerCase().includes('you')) score += 1;\nif (title.length < 90) score += 0.5;\n\n// Return normalized topic object\nreturn [\n  {\n    json: {\n      topic: title,\n      score,\n      source: 'rss',\n      link: $json.link,\n      published_at: $json.pubDate\n    }\n  }\n];\n"
       },
       "id": "1ff0fd2f-3832-407e-983f-6881cb485a25",
-      "name": "Select Best Topic",
+      "name": "Score Topics",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
@@ -45,11 +45,83 @@
     },
     {
       "parameters": {
+        "jsCode": "// Pick the highest-scoring topic so downstream nodes use one clear winner.\nconst items = $input.all();\n\nif (!items.length) {\n  return [];\n}\n\nlet best = items[0];\nfor (const item of items) {\n  if ((item.json.score || 0) > (best.json.score || 0)) {\n    best = item;\n  }\n}\n\nreturn [{\n  json: {\n    topic: best.json.topic,\n    score: best.json.score,\n    source: best.json.source,\n    link: best.json.link,\n    published_at: best.json.published_at\n  }\n}];\n"
+      },
+      "id": "e6bfec44-c4ef-45e2-8c4d-ccf7cb3c7f1f",
+      "name": "Pick Best Topic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "GET",
+        "url": "https://news.google.com/rss/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.topic }}"
+            },
+            {
+              "name": "hl",
+              "value": "en-US"
+            },
+            {
+              "name": "gl",
+              "value": "US"
+            },
+            {
+              "name": "ceid",
+              "value": "US:en"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2f6c0b4f-3b9f-4f35-87da-2d6a5f640d5e",
+      "name": "Topic Research Feed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1552,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Summarize research headlines for prompt grounding.\nconst items = $input.all();\nconst headlines = items\n  .map((item, index) => {\n    const title = item.json?.title || '';\n    const link = item.json?.link || '';\n    return title ? `${index + 1}. ${title} (${link})` : null;\n  })\n  .filter(Boolean)\n  .slice(0, 8);\n\nreturn [{\n  json: {\n    topic: $input.first()?.json?.topic || '',\n    research_headlines: headlines.join('\\n')\n  }\n}];\n"
+      },
+      "id": "0b7c2cdd-8b4a-4bf4-a3d6-8c25c5f2bdb3",
+      "name": "Summarize Research",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        -400
+      ]
+    },
+    {
+      "parameters": {
         "requestMethod": "POST",
         "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
         "jsonParameters": true,
         "options": {},
-        "bodyParametersJson": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"You are a viral YouTube scriptwriter. Create a script for a 2 minute psychological thriller video about: {{ $json.topic }}. \\n\\nOUTPUT JSON format only (no markdown). \\n\\nRULES:\\n1. 'narration': The text to be spoken (2 minute runtime)\\n2. 'visual_query': A concrete, physical search term for Pixabay (e.g. 'storm clouds', 'busy crowd')\\n3. MUST include a KILLER HOOK in first 10 seconds that makes viewers say \\\"I need to know more!\\\"\\n4. EVERY scene must make viewers think \\\"This is about ME\\\" (extreme relatability)\\n5. Each scene should end with an UNANSWERED QUESTION to keep viewers watching\\n6. Total script must have 1-3 scenes (each 15-22 seconds) for 2 minute runtime\\n7. Include 3 \\\"pattern interrupt\\\" moments that surprise viewers\\n8. Every 3rd scene must contain a real psychological fact with cited source\\n\\nSCHEMA:\\n{\\n  \\\"script\\\": [\\n    {\\n      \\\"scene_index\\\": 1,\\n      \\\"narration\\\": \\\"Your 10-second hook that triggers immediate emotional connection...\\\",\\n      \\\"visual_query\\\": \\\"concrete physical search term\\\",\\n      \\\"duration\\\": 10\\n    },\\n    {\\n      \\\"scene_index\\\": 2,\\n      \\\"narration\\\": \\\"Relatable moment that makes viewers think 'This is me!'...\\\",\\n      \\\"visual_query\\\": \\\"concrete physical search term\\\",\\n      \\\"duration\\\": 18\\n    },\\n    {\\n      \\\"scene_index\\\": 3,\\n      \\\"narration\\\": \\\"Psychological fact: '78% of people experience this daily' (source: Journal of Behavioral Psychology, 2023)...\\\",\\n      \\\"visual_query\\\": \\\"concrete physical search term\\\",\\n      \\\"duration\\\": 22\\n    }\\n  ]\\n}\\"\n        }\n      ]\n    }\n  ]\n}\n",
+        "bodyParametersJson": "={
+  \"contents\": [
+    {
+      \"parts\": [
+        {
+          \"text\": \"You are a viral YouTube scriptwriter. Create a 6-8 minute psychological thriller video about: {{ $json.topic }}.\\n\\nUse this research context for realism:\\n{{ $json.research_headlines }}\\n\\nControl parameters (from last run): hook_intensity={{ $node['Read Control Parameters'].json.hook_intensity }}, hook_duration_seconds={{ $node['Read Control Parameters'].json.hook_duration_seconds }}, question_frequency={{ $node['Read Control Parameters'].json.question_frequency }}, first_question_time_seconds={{ $node['Read Control Parameters'].json.first_question_time_seconds }}, pacing={{ $node['Read Control Parameters'].json.pacing }}, psychological_pressure={{ $node['Read Control Parameters'].json.psychological_pressure }}, topic_breadth={{ $node['Read Control Parameters'].json.topic_breadth }}\\n\\nOUTPUT JSON format only (no markdown).\\n\\nRULES:\\n1. 'narration': The text to be spoken (6-8 minute runtime)\\n2. 'visual_query': A concrete, physical search term for Pixabay (e.g. 'storm clouds', 'busy crowd')\\n3. MUST include a KILLER HOOK in first 10 seconds that makes viewers say \\\"I need to know more!\\\"\\n4. EVERY scene must feel like it's about the viewer (extreme relatability)\\n5. End every scene with an UNANSWERED QUESTION\\n6. Total script must have 12-18 scenes (each 20-35 seconds) to reach 6-8 minutes\\n7. Include 3 \\\"pattern interrupt\\\" moments that surprise viewers\\n8. Every 3rd scene must contain a real psychological fact with cited source\\n9. The narration must sound natural and human (avoid robotic or repetitive phrasing)\\n\\nSCHEMA:\\n{\\n  \\\"script\\\": [\\n    {\\n      \\\"scene_index\\\": 1,\\n      \\\"narration\\\": \\\"Your 10-second hook that triggers immediate emotional connection...\\\",\\n      \\\"visual_query\\\": \\\"concrete physical search term\\\",\\n      \\\"duration\\\": 24\\n    }\\n  ]\\n}\\"\n        }
+      ]
+    }
+  ]
+}
+",
         "headerParametersJson": "{\n  \"Content-Type\": \"application/json\"\n}\n",
         "queryParametersJson": "{\n  \"key\": \"AIzaSyA2buQhJ5uZX-Ym2v89rSVYD-zzaSTECHc\"\n}\n"
       },
@@ -78,10 +150,10 @@
     },
     {
       "parameters": {
-        "functionCode": "// Generate mock analytics for testing\nconst mockAnalytics = {\n  views: Math.floor(Math.random() * 1000) + 100,\n  averageViewDuration: Math.floor(Math.random() * 120) + 30,\n  retention_30s: Math.random().toFixed(2),\n  retention_60s: Math.random().toFixed(2)\n};\nreturn [{ json: mockAnalytics }];"
+        "functionCode": "// Fetch analytics from a local file if available, otherwise fallback to mock data.\nconst fs = require('fs');\n\nlet analytics;\ntry {\n  if (fs.existsSync('./analytics.json')) {\n    analytics = JSON.parse(fs.readFileSync('./analytics.json', 'utf8'));\n  }\n} catch (error) {\n  analytics = null;\n}\n\nif (!analytics) {\n  analytics = {\n    views: Math.floor(Math.random() * 1000) + 100,\n    averageViewDuration: Math.floor(Math.random() * 120) + 30,\n    retention_30s: Math.random().toFixed(2),\n    retention_60s: Math.random().toFixed(2)\n  };\n}\n\nreturn [{ json: analytics }];"
       },
       "id": "85364d6c-c673-45ff-9c71-e8e27f27e1c0",
-      "name": "Mock Analytics",
+      "name": "Fetch Analytics",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
@@ -92,8 +164,11 @@
     {
       "parameters": {
         "authentication": "headerAuth",
+        "requestMethod": "POST",
         "url": "https://api.deepseek.com/chat/completions",
-        "options": {}
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"model\": \"deepseek-chat\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You analyze YouTube analytics and provide concrete improvements for the next script. Output JSON only.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Here are the latest video analytics: {{ JSON.stringify($json) }}.\\n\\nReturn an updated control parameter object with fields: hook_intensity, hook_duration_seconds, question_frequency, first_question_time_seconds, pacing, psychological_pressure, topic_breadth, and a short improvement_summary.\"\n    }\n  ],\n  \"temperature\": 0.3\n}\n"
       },
       "id": "39f829ad-ddec-403f-96d7-7f1637da0af9",
       "name": "AI Analysis & Adjustments",
@@ -112,7 +187,7 @@
     },
     {
       "parameters": {
-        "functionCode": "// Save new control parameters for next run\nconst fs = require('fs');\nconst newParams = $json;\n\n// Add timestamp for tracking\nnewParams.last_updated = new Date().toISOString();\n\nfs.writeFileSync('./control_params.json', JSON.stringify(newParams, null, 2));\nreturn [{ json: { status: 'parameters_saved' } }];"
+        "functionCode": "// Save new control parameters for next run\nconst fs = require('fs');\n\nlet newParams = $json;\nconst content = $json?.choices?.[0]?.message?.content;\n\nif (content) {\n  try {\n    newParams = JSON.parse(content);\n  } catch (error) {\n    newParams = { raw_response: content };\n  }\n}\n\n// Add timestamp for tracking\nnewParams.last_updated = new Date().toISOString();\n\nfs.writeFileSync('./control_params.json', JSON.stringify(newParams, null, 2));\nreturn [{ json: { status: 'parameters_saved', params: newParams } }];"
       },
       "id": "108b11d7-00d9-419d-8ccc-4844e710ae48",
       "name": "Save Control Parameters",
@@ -427,7 +502,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const inputData = $input.all()[0];\n\n// Preserve the binary data from Download File node\nconst binaryData = inputData.binary;\n\n// Get topic from ANY available source\nconst topic = \n  ($input.first()?.json?.topic) ||                          \n  ($node['Select Best Topic']?.json[0]?.topic) ||            \n  ($node['BETTER SCRIPTING']?.json[0]?.video_query) ||       \n  \"Dark Psychology Secrets\";                                 \n\n// Generate title\nconst cleanTopic = String(topic).substring(0, 40);\nconst year = new Date().getFullYear();\nconst title = `SHOCKING ${cleanTopic} (${year})`;\n\n// Create description\nconst description = `🔥 ${cleanTopic}\n00:00 - The truth about ${cleanTopic}\n01:30 - What they don't want you to know\n03:00 - How to protect yourself\n#DarkPsychology #${cleanTopic.replace(/\\s+/g, '')} #${year}\n→ SUBSCRIBE for more psychology insights`;\n\n// Generate tags\nconst tags = [\n  cleanTopic,\n  'dark psychology',\n  'psychology 2026',\n  'mental health',\n  'behavioral science'\n].join(',');\n\nreturn [{\n  json: {\n    title,\n    description,\n    tags\n  },\n  binary: binaryData  // ✅ Preserve binary data!\n}];\n"
+        "jsCode": "const inputData = $input.all()[0];\n\n// Preserve the binary data from Download File node\nconst binaryData = inputData.binary;\n\n// Get topic from ANY available source\nconst topic = \n  ($input.first()?.json?.topic) ||                          \n  ($node['Pick Best Topic']?.json[0]?.topic) ||            \n  ($node['BETTER SCRIPTING']?.json[0]?.video_query) ||       \n  \"Dark Psychology Secrets\";                                 \n\n// Generate title\nconst cleanTopic = String(topic).substring(0, 40);\nconst year = new Date().getFullYear();\nconst title = `SHOCKING ${cleanTopic} (${year})`;\n\n// Create description\nconst description = `🔥 ${cleanTopic}\n00:00 - The truth about ${cleanTopic}\n01:30 - What they don't want you to know\n03:00 - How to protect yourself\n#DarkPsychology #${cleanTopic.replace(/\\s+/g, '')} #${year}\n→ SUBSCRIBE for more psychology insights`;\n\n// Generate tags\nconst tags = [\n  cleanTopic,\n  'dark psychology',\n  'psychology 2026',\n  'mental health',\n  'behavioral science'\n].join(',');\n\nreturn [{\n  json: {\n    title,\n    description,\n    tags\n  },\n  binary: binaryData  // ✅ Preserve binary data!\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -557,11 +632,44 @@
         ]
       ]
     },
-    "Select Best Topic": {
+    "Score Topics": {
+      "main": [
+        [
+          {
+            "node": "Pick Best Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Best Topic": {
       "main": [
         [
           {
             "node": "Update the sheet for video GEN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Topic Research Feed": {
+      "main": [
+        [
+          {
+            "node": "Summarize Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Research": {
+      "main": [
+        [
+          {
+            "node": "Generate Script & Scenes",
             "type": "main",
             "index": 0
           }
@@ -583,14 +691,14 @@
       "main": [
         [
           {
-            "node": "Mock Analytics",
+            "node": "Fetch Analytics",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Mock Analytics": {
+    "Fetch Analytics": {
       "main": [
         [
           {
@@ -632,7 +740,7 @@
       "main": [
         [
           {
-            "node": "Select Best Topic",
+            "node": "Score Topics",
             "type": "main",
             "index": 0
           }
@@ -654,7 +762,7 @@
       "main": [
         [
           {
-            "node": "Generate Script & Scenes",
+            "node": "Topic Research Feed",
             "type": "main",
             "index": 0
           }
