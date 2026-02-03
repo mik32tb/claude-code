@@ -1,0 +1,831 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {}
+          ]
+        }
+      },
+      "id": "0dd4dd5f-f060-4827-bd39-17b912be1875",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{\n  json: {\n    hook_intensity: 0.7,\n    hook_duration_seconds: 15,\n    question_frequency: 0.3,\n    first_question_time_seconds: 45,\n    pacing: \"medium\",\n    psychological_pressure: 0.5,\n    topic_breadth: \"balanced\"\n  }\n}];\n"
+      },
+      "id": "5001e7b2-2f1a-4a3e-a205-90f9b2f75eb7",
+      "name": "Read Control Parameters",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        224,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// RSS-based topic selection\n\n// n8n gives one item per RSS entry\n// We will transform each item into a usable topic\n\nconst title = $json.title;\nconst snippet = $json.contentSnippet || '';\n\n// Basic validation\nif (!title) {\n  return [];\n}\n\n// Simple heuristic scoring (can improve later)\nlet score = 0;\n\n// Strong psychology keywords\nconst keywords = [\n  'dark',\n  'manipulate',\n  'manipulation',\n  'control',\n  'personality',\n  'traits',\n  'psychology',\n  'behavior',\n  'toxic'\n];\n\n// Score based on keyword presence\nkeywords.forEach(keyword => {\n  if (title.toLowerCase().includes(keyword)) {\n    score += 1;\n  }\n});\n\n// Prefer titles that sound personal / emotional\nif (title.toLowerCase().includes('people')) score += 0.5;\nif (title.toLowerCase().includes('you')) score += 1;\nif (title.length < 90) score += 0.5;\n\n// Return normalized topic object\nreturn [\n  {\n    json: {\n      topic: title,\n      score,\n      source: 'rss',\n      link: $json.link,\n      published_at: $json.pubDate\n    }\n  }\n];\n"
+      },
+      "id": "1ff0fd2f-3832-407e-983f-6881cb485a25",
+      "name": "Select Best Topic",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"You are a viral YouTube scriptwriter. Create a script for a 2 minute psychological thriller video about: {{ $json.topic }}. \\n\\nOUTPUT JSON format only (no markdown). \\n\\nRULES:\\n1. 'narration': The text to be spoken (2 minute runtime)\\n2. 'visual_query': A concrete, physical search term for Pixabay (e.g. 'storm clouds', 'busy crowd')\\n3. MUST include a KILLER HOOK in first 10 seconds that makes viewers say \\\"I need to know more!\\\"\\n4. EVERY scene must make viewers think \\\"This is about ME\\\" (extreme relatability)\\n5. Each scene should end with an UNANSWERED QUESTION to keep viewers watching\\n6. Total script must have 1-3 scenes (each 15-22 seconds) for 2 minute runtime\\n7. Include 3 \\\"pattern interrupt\\\" moments that surprise viewers\\n8. Every 3rd scene must contain a real psychological fact with cited source\\n\\nSCHEMA:\\n{\\n  \\\"script\\\": [\\n    {\\n      \\\"scene_index\\\": 1,\\n      \\\"narration\\\": \\\"Your 10-second hook that triggers immediate emotional connection...\\\",\\n      \\\"visual_query\\\": \\\"concrete physical search term\\\",\\n      \\\"duration\\\": 10\\n    },\\n    {\\n      \\\"scene_index\\\": 2,\\n      \\\"narration\\\": \\\"Relatable moment that makes viewers think 'This is me!'...\\\",\\n      \\\"visual_query\\\": \\\"concrete physical search term\\\",\\n      \\\"duration\\\": 18\\n    },\\n    {\\n      \\\"scene_index\\\": 3,\\n      \\\"narration\\\": \\\"Psychological fact: '78% of people experience this daily' (source: Journal of Behavioral Psychology, 2023)...\\\",\\n      \\\"visual_query\\\": \\\"concrete physical search term\\\",\\n      \\\"duration\\\": 22\\n    }\\n  ]\\n}\\"\n        }\n      ]\n    }\n  ]\n}\n",
+        "headerParametersJson": "{\n  \"Content-Type\": \"application/json\"\n}\n",
+        "queryParametersJson": "{\n  \"key\": \"AIzaSyA2buQhJ5uZX-Ym2v89rSVYD-zzaSTECHc\"\n}\n"
+      },
+      "id": "1eba62ae-91d1-4e50-b707-537003b8b24b",
+      "name": "Generate Script & Scenes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 23
+      },
+      "id": "7e90cfd0-8eac-4460-af66-e94c6a328b6e",
+      "name": "Wait 24 Hours",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        4512,
+        496
+      ],
+      "webhookId": "d7a8555a-29cf-4d25-81b8-a003a870bc29"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Generate mock analytics for testing\nconst mockAnalytics = {\n  views: Math.floor(Math.random() * 1000) + 100,\n  averageViewDuration: Math.floor(Math.random() * 120) + 30,\n  retention_30s: Math.random().toFixed(2),\n  retention_60s: Math.random().toFixed(2)\n};\nreturn [{ json: mockAnalytics }];"
+      },
+      "id": "85364d6c-c673-45ff-9c71-e8e27f27e1c0",
+      "name": "Mock Analytics",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        4736,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "url": "https://api.deepseek.com/chat/completions",
+        "options": {}
+      },
+      "id": "39f829ad-ddec-403f-96d7-7f1637da0af9",
+      "name": "AI Analysis & Adjustments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        4960,
+        496
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MJVnHet3GPy7ZxSH",
+          "name": "pexels api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Save new control parameters for next run\nconst fs = require('fs');\nconst newParams = $json;\n\n// Add timestamp for tracking\nnewParams.last_updated = new Date().toISOString();\n\nfs.writeFileSync('./control_params.json', JSON.stringify(newParams, null, 2));\nreturn [{ json: { status: 'parameters_saved' } }];"
+      },
+      "id": "108b11d7-00d9-419d-8ccc-4844e710ae48",
+      "name": "Save Control Parameters",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        5184,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=dark+psychology+mysterious",
+        "options": {
+          "customFields": ""
+        }
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        -400
+      ],
+      "id": "8043cfd6-1565-40e7-9477-e696bb542511",
+      "name": "RSS Read"
+    },
+    {
+      "parameters": {
+        "keep": "lastItems"
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        880,
+        -400
+      ],
+      "id": "7073c0da-389a-4778-8d11-39401b93f83b",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Clean RSS topic by removing source names like \"- binghamton.edu\"\nconst rawTopic = $json.topic;\n\nif (!rawTopic) {\n  return [];\n}\n\nconst cleanedTopic = rawTopic.replace(/\\s-\\s.*$/, '');\n\nreturn [\n  {\n    json: {\n      topic: cleanedTopic,\n      original_topic: rawTopic\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        -400
+      ],
+      "id": "deaf9b41-4d59-476f-988b-0e67449a246d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: { \n    topic: $json.topic,\n    original_topic: $json.original_topic,\n    debug_topic: $json.topic\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        -400
+      ],
+      "id": "46738c9b-a9c1-4c04-862e-7158151ec4fa",
+      "name": "Debug fix"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1uVU0PoCWGjoTPGf2ACW_wYPZNNEgDlrzPsP08J3sNDw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1uVU0PoCWGjoTPGf2ACW_wYPZNNEgDlrzPsP08J3sNDw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Topic": "={{ $json.topic }}",
+            "Status": "\"Queued\"",
+            "Timestamp": "={{ $now }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Topic",
+              "displayName": "Topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Script",
+              "displayName": "Script",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Narration Text",
+              "displayName": "Narration Text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Video Path",
+              "displayName": "Video Path",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Created At",
+              "displayName": "Created At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Completed At",
+              "displayName": "Completed At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1328,
+        -400
+      ],
+      "id": "cd548bc3-5092-4d0e-9899-9096cda980b3",
+      "name": "Update the sheet for video GEN",
+      "credentials": {
+        "googleApi": {
+          "id": "sNUhqsGTYGojzlLG",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1️⃣ Get raw Gemini text\nconst raw = $json.candidates[0].content.parts[0].text\n  .replace(/```json|```/g, '')\n  .trim();\n\n// 2️⃣ Parse JSON safely\nlet data;\ntry {\n  data = JSON.parse(raw);\n} catch (e) {\n  throw new Error('Failed to parse Gemini JSON');\n}\n\nif (!Array.isArray(data.script)) {\n  throw new Error('Gemini output missing script array');\n}\n\n// 3️⃣ HARD-SAFE Pixabay query sanitizer\nfunction sanitizeQuery(input) {\n  if (!input || typeof input !== 'string') {\n    return 'dark scene';\n  }\n\n  return input\n    .toLowerCase()\n    .replace(/[,.;:]/g, ' ')   // remove commas & punctuation\n    .replace(/\\s+/g, ' ')      // normalize spaces\n    .trim()\n    .split(' ')\n    .slice(0, 3)               // MAX 3 WORDS (Pixabay-safe)\n    .join(' ');\n}\n\n// 4️⃣ Emit ONE ITEM PER SCENE (loop-ready)\nreturn data.script.map(scene => ({\n  json: {\n    scene_index: scene.scene_index,\n    narration: scene.narration,\n    video_query: sanitizeQuery(scene.visual_query),\n    audio_path: `/tmp/audio_${scene.scene_index}.wav`,\n    video_raw_path: `/tmp/video_raw_${scene.scene_index}.mp4`,\n    scene_final_path: `/tmp/scene_final_${scene.scene_index}.mp4`\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        -400
+      ],
+      "id": "50b6d97e-453f-4f18-a4cb-e62c2df5e025",
+      "name": "BETTER SCRIPTING"
+    },
+    {
+      "parameters": {
+        "url": "https://pixabay.com/api/videos/",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "54464920-4a3ce7aed37fed4974c4ab69f"
+            },
+            {
+              "name": "q",
+              "value": "={{ $('Loop Over Items').item.json.video_query }}"
+            },
+            {
+              "name": "per_page",
+              "value": "4"
+            },
+            {
+              "name": "safesearch",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3072,
+        -304
+      ],
+      "id": "05aafa7a-64f1-4bad-8f0a-0bc786218795",
+      "name": "Pixaby get"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.video_url }}",
+        "responseFormat": "file",
+        "options": {}
+      },
+      "id": "83709493-b986-41e5-9d94-c2325fadddfe",
+      "name": "Download videos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        3168,
+        -688
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2448,
+        -400
+      ],
+      "id": "58bfb757-260d-48a6-a61f-fa06005f6f0e",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "command": "=rm -f /tmp/scene_final_*.mp4\n\nffmpeg -y \\\n-i \"{{ $json.video_url }}\" \\\n-i \"{{ $json.audio_path }}\" \\\n-map 0:v:0 -map 1:a:0 \\\n-vf \"\nscale=1920:1080:force_original_aspect_ratio=increase,\ncrop=1920:1080,\nfps=24,\neq=saturation=0.7:contrast=1.25:brightness=-0.04:gamma=1.08,\nnoise=c0s=1.5:allf=t+u,\nvignette=PI/5,\nunsharp=3:3:1.2:3:3:0.4,\ngradfun=strength=1.1:radius=12\n\" \\\n-c:v libx264 -preset fast -profile:v high -pix_fmt yuv420p -crf 22 \\\n-c:a aac -b:a 192k \\\n-shortest \\\n-avoid_negative_ts make_zero \\\n\"{{ $json.scene_final_path }}\"\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3456,
+        -608
+      ],
+      "id": "5381b688-6faf-4ea0-947b-f683046a65e0",
+      "name": "FFMPEG RENDER"
+    },
+    {
+      "parameters": {
+        "command": "=#!/bin/bash\nset -e\n\n# 1. CLEANUP: Remove old artifacts to prevent mixing past runs\n# (If you don't do this, a previous run's \"scene_10.mp4\" might get added to a new 5-scene video!)\nrm -f /tmp/scenes.txt /tmp/final_video.mp4\n\necho \"=== Checking scene files ===\"\n# 2. DYNAMIC LOOP: Sorts files naturally (scene_1, scene_2... scene_10)\n# This handles any number of scenes, not just 10.\nfind /tmp -name \"scene_final_*.mp4\" -print0 | sort -z -V | while IFS= read -r -d '' file; do\n  echo \"file '$file'\" >> /tmp/scenes.txt\n  echo \"Added $file to list\"\ndone\n\n# 3. VERIFY: Check if scenes.txt actually has content\nif [ ! -s /tmp/scenes.txt ]; then\n  echo \"ERROR: No scene files found in /tmp/!\"\n  # List tmp to help debug what IS there\n  ls -la /tmp/\n  exit 1\nfi\n\necho \"=== Concatenating scenes ===\"\n# 4. CONCAT: Added '-safe 0' (already there, good) and proper error handling\nif ffmpeg -y -f concat -safe 0 -i /tmp/scenes.txt -c copy /tmp/final_video.mp4; then\n    SIZE=$(stat -c%s \"/tmp/final_video.mp4\")\n    echo \"Final video created: $SIZE bytes\"\n    # Return JSON for n8n\n    echo \"{\\\"final_path\\\": \\\"/tmp/final_video.mp4\\\"}\"\nelse\n    echo \"ERROR: FFmpeg concatenation failed.\"\n    exit 1\nfi"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3664,
+        -384
+      ],
+      "id": "e9629373-f47c-4aa3-b85f-ff56713ad096",
+      "name": "after loop"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1️⃣ Get the TTS output (which contains the duration)\nconst ttsOutput = $input.item.json;\n\n// 2️⃣ Verify we have duration from TTS\nif (!ttsOutput.duration || ttsOutput.duration === \"0\") {\n  console.warn(\"TTS node missing duration. Using fallback of 5.0 seconds\");\n  ttsOutput.duration = \"5.0\";\n}\n\n// 3️⃣ Get the original loop item (for scene context)\nconst loopItem = $('Loop Over Items').item.json;\n\n// 4️⃣ Preserve ALL required data for FFMPEG\nreturn [{\n  json: {\n    audio_path: loopItem.audio_path,\n    scene_index: loopItem.scene_index,\n    scene_final_path: loopItem.scene_final_path,\n    video_query: loopItem.video_query,\n    duration: ttsOutput.duration,  // Use duration from TTS output\n    video_url: $json.hits[0].videos.large.url\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        -624
+      ],
+      "id": "bfeadbfd-0141-4270-91fa-1682d32955f7",
+      "name": "helps with downloading"
+    },
+    {
+      "parameters": {
+        "command": "=#!/bin/bash\nset -e\n\n# 1. Generate the audio\necho \"{{ $json.narration }}\" | python3 -m piper \\\n  --model /home/node/.local/share/piper_tts/voices/en_US-lessac-medium.onnx \\\n  --output_file /tmp/audio_raw_{{ $json.scene_index }}.wav\n\n# 2. Simple but effective enhancement\nffmpeg -y -i /tmp/audio_raw_{{ $json.scene_index }}.wav \\\n  -filter:a \"\n    highpass=f=80,\n    lowpass=f=8000,\n    acompressor=threshold=0.1:ratio=4:attack=20:release=300,\n    loudnorm=I=-16:LRA=11:TP=-1.5\n  \" \\\n  \"{{ $json.audio_path }}\"\n\n# 3. Get duration\nDURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"{{ $json.audio_path }}\")\n\n# 4. Success\necho \"{\\\"scene\\\": {{ $json.scene_index }}, \\\"status\\\": \\\"generated\\\", \\\"path\\\": \\\"{{ $json.audio_path }}\\\", \\\"duration\\\": \\\"$DURATION\\\"}\"\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2720,
+        -272
+      ],
+      "id": "7da86255-d263-40cf-9d16-1283c7b5c861",
+      "name": "TTS GERATION"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputData = $input.all()[0];\n\n// Preserve the binary data from Download File node\nconst binaryData = inputData.binary;\n\n// Get topic from ANY available source\nconst topic = \n  ($input.first()?.json?.topic) ||                          \n  ($node['Select Best Topic']?.json[0]?.topic) ||            \n  ($node['BETTER SCRIPTING']?.json[0]?.video_query) ||       \n  \"Dark Psychology Secrets\";                                 \n\n// Generate title\nconst cleanTopic = String(topic).substring(0, 40);\nconst year = new Date().getFullYear();\nconst title = `SHOCKING ${cleanTopic} (${year})`;\n\n// Create description\nconst description = `🔥 ${cleanTopic}\n00:00 - The truth about ${cleanTopic}\n01:30 - What they don't want you to know\n03:00 - How to protect yourself\n#DarkPsychology #${cleanTopic.replace(/\\s+/g, '')} #${year}\n→ SUBSCRIBE for more psychology insights`;\n\n// Generate tags\nconst tags = [\n  cleanTopic,\n  'dark psychology',\n  'psychology 2026',\n  'mental health',\n  'behavioral science'\n].join(',');\n\nreturn [{\n  json: {\n    title,\n    description,\n    tags\n  },\n  binary: binaryData  // ✅ Preserve binary data!\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4096,
+        -368
+      ],
+      "id": "381dc34e-1638-4e98-b930-f68f3a728ece",
+      "name": "SEO"
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $json.title }}",
+        "regionCode": "US",
+        "categoryId": "=22",
+        "binaryProperty": "=data",
+        "options": {
+          "description": "={{ $json.description }}",
+          "embeddable": true,
+          "tags": "={{ $json.tags }}"
+        }
+      },
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        4880,
+        -496
+      ],
+      "id": "f6a39d6e-84e2-47de-8f83-acf875549af6",
+      "name": "Upload a video",
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "LmKezSaSk3fLMOR6",
+          "name": "youtube upload"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $getWorkflowStaticData('global');\n\nif (!data.seen) {\n  data.seen = {};\n}\n\n// 1. Remove already-used topics\nconst freshItems = items.filter(item => {\n  const key = item.json.guid || item.json.title;\n  return !data.seen[key];\n});\n\n// 2. Shuffle randomly (Fisher–Yates)\nfor (let i = freshItems.length - 1; i > 0; i--) {\n  const j = Math.floor(Math.random() * (i + 1));\n  [freshItems[i], freshItems[j]] = [freshItems[j], freshItems[i]];\n}\n\n// 3. Pick max 10 topics\nconst selected = freshItems.slice(0, 10);\n\n// 4. Lock them so they never appear again\nfor (const item of selected) {\n  const key = item.json.guid || item.json.title;\n  data.seen[key] = true;\n}\n\nreturn selected;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        -400
+      ],
+      "id": "c918352c-796b-4f6e-986c-66a98790e169",
+      "name": "NEVER RETURN SAME TOPIC"
+    },
+    {
+      "parameters": {
+        "command": "=# 1. Check what files exist\nls -la /tmp/final_video.mp4\n\n# 2. Copy to binary format safely\ncp \"/tmp/final_video.mp4\" \"/tmp/video_for_upload.mp4\"\n\n# 3. Output success\necho \"video_copied_successfully\"\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3872,
+        -384
+      ],
+      "id": "c4cddd28-66ef-443c-9af4-8917aaaa3e77",
+      "name": "Execute Command"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/tmp/final_video.mp4",
+        "options": {
+          "fileName": "data",
+          "dataPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        4304,
+        -368
+      ],
+      "id": "499a3b18-41cf-4823-80c5-6e4a88dfd7ec",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ec5dfbd5-9a73-497b-ac5c-7cef5fa798ea",
+              "name": "final_video.mp4",
+              "value": "video/mp4",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4512,
+        -368
+      ],
+      "id": "a0dffca1-0628-4042-bcbd-a17cabf6b759",
+      "name": "Edit Fields"
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Control Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Control Parameters": {
+      "main": [
+        [
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Best Topic": {
+      "main": [
+        [
+          {
+            "node": "Update the sheet for video GEN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Script & Scenes": {
+      "main": [
+        [
+          {
+            "node": "BETTER SCRIPTING",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 24 Hours": {
+      "main": [
+        [
+          {
+            "node": "Mock Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Analytics": {
+      "main": [
+        [
+          {
+            "node": "AI Analysis & Adjustments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Analysis & Adjustments": {
+      "main": [
+        [
+          {
+            "node": "Save Control Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Control Parameters": {
+      "main": [
+        []
+      ]
+    },
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "NEVER RETURN SAME TOPIC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Select Best Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Debug fix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debug fix": {
+      "main": [
+        [
+          {
+            "node": "Generate Script & Scenes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update the sheet for video GEN": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BETTER SCRIPTING": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pixaby get": {
+      "main": [
+        [
+          {
+            "node": "helps with downloading",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download videos": {
+      "main": [
+        [
+          {
+            "node": "FFMPEG RENDER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "after loop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TTS GERATION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FFMPEG RENDER": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "after loop": {
+      "main": [
+        [
+          {
+            "node": "Execute Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "helps with downloading": {
+      "main": [
+        [
+          {
+            "node": "Download videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TTS GERATION": {
+      "main": [
+        [
+          {
+            "node": "Pixaby get",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SEO": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NEVER RETURN SAME TOPIC": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command": {
+      "main": [
+        [
+          {
+            "node": "SEO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Upload a video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b43cb8a5f13fec6591de7cbf9f99b2e19436fb9db437e3498d99c91a074042a4"
+  }
+}
